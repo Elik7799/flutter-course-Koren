@@ -38,7 +38,6 @@ class Lab1App extends StatelessWidget {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               task2(),
-
               const SizedBox(height: 4),
               Divider(),
               const SizedBox(height: 4),
@@ -82,34 +81,70 @@ class Lab1App extends StatelessWidget {
 // 1. Заголовок — Text, крупный жирный текст чёрного цвета, обрезается в одну строку, если не помещается.
 Widget task1() {
   // TODO: замените Placeholder на Text()
-  return Placeholder(fallbackHeight: 24);
+  return const Text(
+    'Очень длинный заголовок, который по идее не может поместиться на вашем экране, это я вам точно говорю',
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      fontSize: 40,
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF000000)
+      ),
+  );
 }
 
 // 2. Подпись — небольшой, нежирный курсивный текст белого цвета, обрезается в две строки.
 // Также реализуйте подложку из тёмно-серого контейнера с закруглениями, чтобы текст было видно
 Widget task2() {
   // TODO: замените Placeholder на ...
-  return Placeholder(fallbackHeight: 24);
+  return Container(
+    padding: EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: Color.fromARGB(255, 80, 74, 74),
+      borderRadius: BorderRadius.circular(10)
+    ),
+    child: Text('Небольшая уже подпись, которая также не помещается на вашем экране, как и предыдущяя, но только она длинее, потому что уже должна быть небольшой, но также и очень длинной, чтобы дотянуть количество символов до двух строк, чтобы показать, что этот текст обрезается в две строки. И так, на чем я оставновился...А да, мне нужно налить здесь воды немеренно, чтобы этот текст ну уж точно не поместился в две строки на любом экране',
+    maxLines: 2,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      fontSize: 20,
+      fontStyle: FontStyle.italic,
+      color: Color(0xFFFFFFFF)
+    ),),
+
+  );
 }
 
 // 3. Иконка — любая Icon на ваш вкус,
 // с применением цвета и размером.
 Widget task3() {
   // TODO: замените Placeholder на...
-  return Placeholder(fallbackHeight: 32, fallbackWidth: 32);
+  return const Icon(Icons.access_alarm_sharp, color: Color.fromARGB(255, 6, 194, 219), size: 40);
 }
 
 // 4. Кнопка с иконкой избранного — большая иконка сердца красного цвета без фона.
 // При нажатии пишет в консоль "Вы добавили в избранное"
 Widget task4() {
   // TODO: замените Placeholder на ...
-  return Placeholder(fallbackHeight: 32, fallbackWidth: 32);
+  return IconButton(
+    icon: const Icon(Icons.favorite, color: Color.fromARGB(255, 255, 0, 0), size: 40),
+    onPressed: (){print('Вы добавили в избранное');},
+    );
 }
 
 // 5. Кнопка «Подробнее» — кнопка с текстом и обводкой, при нажатии пишет в консоль "Узнать детали"
 Widget task5() {
   // TODO: замените Placeholder на ...
-  return Placeholder(fallbackHeight: 32, fallbackWidth: 32);
+  return ElevatedButton(
+    onPressed: (){print('Узнать детали');},
+    child: Text('Подробнее', style: TextStyle(fontSize: 20)),
+    style: ElevatedButton.styleFrom(
+      padding: EdgeInsets.fromLTRB(40, 20, 40, 20),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(25),
+        side: BorderSide(color: Color.fromARGB(255, 34, 28, 202), width: 6)
+      )
+    )
+  );
 }
 
 // 6. Изображение в стиле Polaroid—  выберите любое из каталога по ссылке
@@ -118,5 +153,12 @@ Widget task5() {
 // Для реализации используйте Container
 Widget task6() {
   // TODO: замените Placeholder на Container()
-  return Placeholder(fallbackHeight: 32, fallbackWidth: 32);
+  return Container(
+    child: Image.network('https://docs.flutter.dev/assets/images/dash/dash-fainting.gif', height: 180),
+    padding: const EdgeInsets.fromLTRB(12, 12, 12, 50),
+    decoration: BoxDecoration(
+      color: Color(0xFFFFFFFF),
+      border: Border.all(color: Colors.black, width: 3)
+    ),
+  );
 }
