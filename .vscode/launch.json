@@ -11,16 +11,58 @@
             "program": "lib/hw1/main.dart"
         },
         {
-            "name": "hw (profile mode)",
+            "name": "hw2",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "profile"
+            "program": "lib/hw2/main.dart"
         },
         {
-            "name": "hw (release mode)",
+            "name": "hw3",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release"
-        }
+            "program": "lib/hw3/main.dart"
+        },
+        {
+            "name": "hw4",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw4/main.dart"
+        },
+        {
+            "name": "hw5",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw5/main.dart"
+        },
+        {
+            "name": "hw6",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw6/main.dart"
+        },
+        {
+            "name": "hw7",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw7/main.dart"
+        },
+        {
+            "name": "hw8",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw8/main.dart"
+        },
+        {
+            "name": "hw9",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw9/main.dart"
+        },
+        {
+            "name": "hw10",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/hw10/main.dart"
+        },
     ]
 }
