@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Movie {
   final String id;
   final String title;
@@ -13,12 +15,13 @@ class Movie {
     required this.imageUrl,
   });
 
-  factory Movie.fromJson(Map<String, dynamic> json) {
+  factory Movie.fromFirestore(DocumentSnapshot doc) {
+    final json = doc.data() as Map<String, dynamic>? ?? {};
     return Movie(
-      id: json['id']?.toString() ?? '',
+      id: doc.id,
       title: json['title'] as String? ?? '',
       subtitle: json['subtitle'] as String? ?? '',
-      categories: (json['categories'] as List<dynamic>? ?? [])
+      categories: (json['genres'] as List<dynamic>? ?? [])
           .map((category) => category.toString())
           .toList(),
       imageUrl: json['imageUrl'] as String? ?? '',
@@ -29,7 +32,7 @@ class Movie {
     return {
       'title': title,
       'subtitle': subtitle,
-      'categories': categories,
+      'genres': categories,
       'imageUrl': imageUrl,
     };
   }
