@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../bloc/movies_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../widgets/movie_card.dart';
+import 'movie_details_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -14,122 +15,96 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  final Set<String> _likedIds = {};
   bool _showOnlyLiked = false;
-  bool _isAdding = false;
-
-  void _toggleLike(String id) {
-    if (id.isEmpty) return;
-    setState(() {
-      if (_likedIds.contains(id)) {
-        _likedIds.remove(id);
-      } else {
-        _likedIds.add(id);
-      }
-    });
-  }
+  final TextEditingController _searchController = TextEditingController();
 
   Future<void> _showAddMovieDialog() async {
     final titleController = TextEditingController();
     final subtitleController = TextEditingController();
     final imageController = TextEditingController();
     final categoriesController = TextEditingController();
+    final descController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     final movieData = await showDialog<Map<String, String>>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Добавить фильм'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Название фильма'),
-                    validator: (value) => (value == null || value.trim().isEmpty) ? 'Введите название' : null,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Добавить фильм'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Название *'),
+                  validator: (v) => v!.isEmpty ? 'Обязательно' : null,
+                ),
+                TextFormField(
+                  controller: subtitleController,
+                  decoration: const InputDecoration(labelText: 'Подзаголовок'),
+                ),
+                TextFormField(
+                  controller: imageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ссылка на постер',
                   ),
-                  TextFormField(
-                    controller: subtitleController,
-                    decoration: const InputDecoration(labelText: 'Подзаголовок', hintText: 'MARVEL - 2026'),
+                  validator: (v) =>
+                      !v!.startsWith('http') ? 'Некорректный URL' : null,
+                ),
+                TextFormField(
+                  controller: categoriesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Категории (через запятую)',
                   ),
-                  TextFormField(
-                    controller: imageController,
-                    decoration: const InputDecoration(labelText: 'Ссылка на постер'),
-                    validator: (value) {
-                      final text = value?.trim() ?? '';
-                      if (text.isEmpty) return 'Введите ссылку';
-                      final uri = Uri.tryParse(text);
-                      if (uri == null || !uri.hasScheme || !(uri.scheme == 'http' || uri.scheme == 'https')) {
-                        return 'Введите корректный URL';
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: categoriesController,
-                    decoration: const InputDecoration(labelText: 'Категории через запятую'),
-                  ),
-                ],
-              ),
+                ),
+                TextFormField(
+                  controller: descController,
+                  decoration: const InputDecoration(labelText: 'Описание'),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(dialogContext, {
-                    'title': titleController.text.trim(),
-                    'subtitle': subtitleController.text.trim(),
-                    'imageUrl': imageController.text.trim(),
-                    'categories': categoriesController.text.trim(),
-                  });
-                }
-              },
-              child: const Text('Добавить'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, {
+                  'title': titleController.text.trim(),
+                  'subtitle': subtitleController.text.trim(),
+                  'imageUrl': imageController.text.trim(),
+                  'categories': categoriesController.text.trim(),
+                  'description': descController.text.trim(),
+                });
+              }
+            },
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
     );
 
-    if (movieData == null || !mounted) return;
-    await _addMovie(movieData);
-  }
-
-  Future<void> _addMovie(Map<String, String> data) async {
-    setState(() => _isAdding = true);
-    try {
-      final categories = (data['categories'] ?? '')
+    if (movieData != null && mounted) {
+      final categories = (movieData['categories'] ?? '')
           .split(',')
           .map((c) => c.trim())
           .where((c) => c.isNotEmpty)
           .toList();
-          
       final newMovie = Movie(
         id: '',
-        title: data['title']!,
-        subtitle: data['subtitle'] ?? '',
+        title: movieData['title']!,
+        subtitle: movieData['subtitle'] ?? '',
         categories: categories,
-        imageUrl: data['imageUrl']!,
+        imageUrl: movieData['imageUrl']!,
+        description: movieData['description'] ?? '',
       );
-
-      await FirebaseFirestore.instance.collection('movies').add(newMovie.toJson());
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Фильм добавлен!')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось добавить фильм: $e')));
-    } finally {
-      if (mounted) setState(() => _isAdding = false);
+      context.read<MoviesBloc>().add(MovieAdded(newMovie));
     }
   }
 
@@ -137,17 +112,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Каталог фильмов'),
+        title: const Text('Каталог'),
         actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                'В избранном: ${_likedIds.length}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => FirebaseAuth.instance.signOut(),
@@ -156,68 +122,79 @@ class _CatalogScreenState extends State<CatalogScreen> {
       ),
       body: BlocBuilder<MoviesBloc, MoviesState>(
         builder: (context, state) {
-          if (state is MoviesLoadInProgress) {
+          if (state is MoviesLoadInProgress)
             return const Center(child: CircularProgressIndicator());
-          }
-
           if (state is MoviesLoadFailure) {
             return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(state.message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: () => context.read<MoviesBloc>().add(MoviesLoadRequested()),
-                      child: const Text('Обновить'),
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.message,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  ElevatedButton(
+                    onPressed: () =>
+                        context.read<MoviesBloc>().add(MoviesLoadRequested()),
+                    child: const Text('Обновить'),
+                  ),
+                ],
               ),
             );
           }
 
           if (state is MoviesLoadSuccess) {
-            final allMovies = state.movies;
+            final baseMovies = state.filteredMovies;
             final displayedMovies = _showOnlyLiked
-                ? allMovies.where((movie) => _likedIds.contains(movie.id)).toList()
-                : allMovies;
+                ? baseMovies
+                      .where((m) => state.likedMovieIds.contains(m.id))
+                      .toList()
+                : baseMovies;
 
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Только избранные', style: TextStyle(fontSize: 16)),
-                      Switch(
-                        value: _showOnlyLiked,
-                        onChanged: (value) => setState(() => _showOnlyLiked = value),
-                      ),
-                    ],
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'Поиск по названию',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) => context.read<MoviesBloc>().add(
+                      MoviesSearchChanged(val),
+                    ),
                   ),
+                ),
+                SwitchListTile(
+                  title: const Text('Только избранные'),
+                  value: _showOnlyLiked,
+                  onChanged: (val) => setState(() => _showOnlyLiked = val),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _isAdding ? null : _showAddMovieDialog,
+                      onPressed: _showAddMovieDialog,
                       icon: const Icon(Icons.add),
-                      label: Text(_isAdding ? 'Добавление...' : 'Добавить фильм'),
+                      label: const Text('Добавить фильм'),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: displayedMovies.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'Ничего не нашлось',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
+                            _showOnlyLiked
+                                ? 'В избранном пока пусто'
+                                : 'Ничего не найдено',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey,
+                            ),
                           ),
                         )
                       : ListView.builder(
@@ -227,10 +204,32 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             final movie = displayedMovies[index];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 16),
-                              child: MovieCard(
-                                movie: movie,
-                                isLiked: _likedIds.contains(movie.id),
-                                onLikeTap: () => _toggleLike(movie.id),
+                              child: // В catalog_screen.dart
+                              GestureDetector(
+                                onTap: () {
+                                  // Передаем текущий BLoC экрану деталей
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (navContext) =>
+                                          BlocProvider.value(
+                                            value: context.read<MoviesBloc>(),
+                                            child: MovieDetailsScreen(
+                                              movie: movie,
+                                            ),
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: MovieCard(
+                                  movie: movie,
+                                  isLiked: state.likedMovieIds.contains(
+                                    movie.id,
+                                  ),
+                                  onLikeTap: () => context
+                                      .read<MoviesBloc>()
+                                      .add(MovieLikeToggled(movie.id)),
+                                ),
                               ),
                             );
                           },
@@ -239,7 +238,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ],
             );
           }
-
           return const SizedBox();
         },
       ),

@@ -6,6 +6,7 @@ class Movie {
   final String subtitle;
   final List<String> categories;
   final String imageUrl;
+  final String description;
 
   const Movie({
     required this.id,
@@ -13,6 +14,7 @@ class Movie {
     required this.subtitle,
     required this.categories,
     required this.imageUrl,
+    required this.description,
   });
 
   factory Movie.fromFirestore(DocumentSnapshot doc) {
@@ -21,10 +23,9 @@ class Movie {
       id: doc.id,
       title: json['title'] as String? ?? '',
       subtitle: json['subtitle'] as String? ?? '',
-      categories: (json['genres'] as List<dynamic>? ?? [])
-          .map((category) => category.toString())
-          .toList(),
+      categories: (json['genres'] as List<dynamic>? ?? []).map((c) => c.toString()).toList(),
       imageUrl: json['imageUrl'] as String? ?? '',
+      description: json['description'] as String? ?? 'Описание пока отсутствует.',
     );
   }
 
@@ -34,6 +35,7 @@ class Movie {
       'subtitle': subtitle,
       'genres': categories,
       'imageUrl': imageUrl,
+      'description': description,
     };
   }
 }
