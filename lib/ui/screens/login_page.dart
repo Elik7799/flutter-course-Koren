@@ -14,6 +14,29 @@ class _LoginPageState extends State<LoginPage> {
   final _auth = FirebaseAuth.instance;
   String? _errorMessage;
 
+  String _getErrorMessage(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Некорректный формат email.';
+      case 'user-disabled':
+        return 'Этот аккаунт был отключен.';
+      case 'user-not-found':
+        return 'Пользователь с таким email не найден.';
+      case 'wrong-password':
+        return 'Неверный пароль.';
+      case 'email-already-in-use':
+        return 'Этот email уже занят другим аккаунтом.';
+      case 'weak-password':
+        return 'Слишком короткий пароль (минимум 6 символов).';
+      case 'invalid-credential':
+        return 'Неверный email или пароль.';
+      case 'missing-password':
+        return 'Некорректный пароль.';
+      default:
+        return 'Произошла ошибка: $code';
+    }
+  }
+
   Future<void> _signIn() async {
     try {
       setState(() => _errorMessage = null);
@@ -22,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text.trim(),
       );
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorMessage = e.code); 
+      setState(() => _errorMessage = _getErrorMessage(e.code)); 
     }
   }
 
@@ -34,7 +57,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text.trim(),
       );
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorMessage = e.code);
+      setState(() => _errorMessage = _getErrorMessage(e.code));
     }
   }
 
@@ -59,9 +82,25 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 20),
             if (_errorMessage != null)
-              Text('Ошибка: $_errorMessage', style: const TextStyle(color: Colors.red)),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  border: Border.all(color: Colors.red.shade200),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.red.shade900, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: _signIn, child: const Text('Войти')),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(onPressed: _signIn, child: const Text('Войти')),
+            ),
             TextButton(onPressed: _register, child: const Text('Зарегистрироваться')),
           ],
         ),
