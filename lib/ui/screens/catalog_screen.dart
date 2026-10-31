@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../bloc/movies_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../widgets/movie_card.dart';
 
@@ -14,34 +16,17 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> {
   final Set<String> _likedIds = {};
   bool _showOnlyLiked = false;
+  bool _isAdding = false;
 
-  Stream<Set<String>> get _favoritesStream {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return Stream.value({});
-
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('favorites')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
-  }
-
-  Future<void> _toggleLike(String movieId) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    final favRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('favorites')
-        .doc(movieId);
-
-    if (_likedIds.contains(movieId)) {
-      await favRef.delete();
-    } else {
-      await favRef.set({'liked': true});
-    }
+  void _toggleLike(String id) {
+    if (id.isEmpty) return;
+    setState(() {
+      if (_likedIds.contains(id)) {
+        _likedIds.remove(id);
+      } else {
+        _likedIds.add(id);
+      }
+    });
   }
 
   Future<void> _showAddMovieDialog() async {
@@ -69,16 +54,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   ),
                   TextFormField(
                     controller: subtitleController,
-                    decoration: const InputDecoration(labelText: 'Подзаголовок'),
+                    decoration: const InputDecoration(labelText: 'Подзаголовок', hintText: 'MARVEL - 2026'),
                   ),
                   TextFormField(
                     controller: imageController,
                     decoration: const InputDecoration(labelText: 'Ссылка на постер'),
-                    validator: (value) => (value == null || !value.startsWith('http')) ? 'Некорректный URL' : null,
+                    validator: (value) {
+                      final text = value?.trim() ?? '';
+                      if (text.isEmpty) return 'Введите ссылку';
+                      final uri = Uri.tryParse(text);
+                      if (uri == null || !uri.hasScheme || !(uri.scheme == 'http' || uri.scheme == 'https')) {
+                        return 'Введите корректный URL';
+                      }
+                      return null;
+                    },
                   ),
                   TextFormField(
                     controller: categoriesController,
-                    decoration: const InputDecoration(labelText: 'Категории (через запятую)'),
+                    decoration: const InputDecoration(labelText: 'Категории через запятую'),
                   ),
                 ],
               ),
@@ -108,30 +101,35 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
 
     if (movieData == null || !mounted) return;
+    await _addMovie(movieData);
+  }
 
-    final categories = (movieData['categories'] ?? '')
-        .split(',')
-        .map((c) => c.trim())
-        .where((c) => c.isNotEmpty)
-        .toList();
-
-    final newMovie = Movie(
-      id: '',
-      title: movieData['title']!,
-      subtitle: movieData['subtitle'] ?? '',
-      categories: categories,
-      imageUrl: movieData['imageUrl']!,
-    );
-
+  Future<void> _addMovie(Map<String, String> data) async {
+    setState(() => _isAdding = true);
     try {
+      final categories = (data['categories'] ?? '')
+          .split(',')
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+          
+      final newMovie = Movie(
+        id: '',
+        title: data['title']!,
+        subtitle: data['subtitle'] ?? '',
+        categories: categories,
+        imageUrl: data['imageUrl']!,
+      );
+
       await FirebaseFirestore.instance.collection('movies').add(newMovie.toJson());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Фильм добавлен!')));
-      }
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Фильм добавлен!')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось добавить фильм: $e')));
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
     }
   }
 
@@ -141,89 +139,108 @@ class _CatalogScreenState extends State<CatalogScreen> {
       appBar: AppBar(
         title: const Text('Каталог фильмов'),
         actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                'В избранном: ${_likedIds.length}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('movies').snapshots(),
-        builder: (context, moviesSnapshot) {
-          if (moviesSnapshot.hasError) {
-            return Center(child: Text('Ошибка: ${moviesSnapshot.error}'));
-          }
-          if (moviesSnapshot.connectionState == ConnectionState.waiting) {
+      body: BlocBuilder<MoviesBloc, MoviesState>(
+        builder: (context, state) {
+          if (state is MoviesLoadInProgress) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!moviesSnapshot.hasData || moviesSnapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Каталог пуст. Добавьте первый фильм!'));
+
+          if (state is MoviesLoadFailure) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(state.message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => context.read<MoviesBloc>().add(MoviesLoadRequested()),
+                      child: const Text('Обновить'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
-          final movies = moviesSnapshot.data!.docs.map((doc) => Movie.fromFirestore(doc)).toList();
+          if (state is MoviesLoadSuccess) {
+            final allMovies = state.movies;
+            final displayedMovies = _showOnlyLiked
+                ? allMovies.where((movie) => _likedIds.contains(movie.id)).toList()
+                : allMovies;
 
-          return StreamBuilder<Set<String>>(
-            stream: _favoritesStream,
-            builder: (context, favoritesSnapshot) {
-              _likedIds.clear();
-              if (favoritesSnapshot.hasData) {
-                _likedIds.addAll(favoritesSnapshot.data!);
-              }
-
-              final displayedMovies = _showOnlyLiked
-                  ? movies.where((m) => _likedIds.contains(m.id)).toList()
-                  : movies;
-
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Только избранные', style: TextStyle(fontSize: 16)),
-                        Switch(
-                          value: _showOnlyLiked,
-                          onChanged: (val) => setState(() => _showOnlyLiked = val),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _showAddMovieDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Добавить фильм'),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Только избранные', style: TextStyle(fontSize: 16)),
+                      Switch(
+                        value: _showOnlyLiked,
+                        onChanged: (value) => setState(() => _showOnlyLiked = value),
                       ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _isAdding ? null : _showAddMovieDialog,
+                      icon: const Icon(Icons.add),
+                      label: Text(_isAdding ? 'Добавление...' : 'Добавить фильм'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: displayedMovies.isEmpty
-                        ? const Center(child: Text('Ничего не нашлось'))
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: displayedMovies.length,
-                            itemBuilder: (context, index) {
-                              final movie = displayedMovies[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: MovieCard(
-                                  movie: movie,
-                                  isLiked: _likedIds.contains(movie.id),
-                                  onLikeTap: () => _toggleLike(movie.id),
-                                ),
-                              );
-                            },
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: displayedMovies.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Ничего не нашлось',
+                            style: TextStyle(fontSize: 18, color: Colors.grey),
                           ),
-                  ),
-                ],
-              );
-            },
-          );
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: displayedMovies.length,
+                          itemBuilder: (context, index) {
+                            final movie = displayedMovies[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: MovieCard(
+                                movie: movie,
+                                isLiked: _likedIds.contains(movie.id),
+                                onLikeTap: () => _toggleLike(movie.id),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          }
+
+          return const SizedBox();
         },
       ),
     );

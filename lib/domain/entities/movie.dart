@@ -16,15 +16,15 @@ class Movie {
   });
 
   factory Movie.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final json = doc.data() as Map<String, dynamic>? ?? {};
     return Movie(
       id: doc.id,
-      title: data['title'] as String? ?? '',
-      subtitle: data['subtitle'] as String? ?? '',
-      categories: (data['genres'] as List<dynamic>? ?? [])
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String? ?? '',
+      categories: (json['genres'] as List<dynamic>? ?? [])
           .map((category) => category.toString())
           .toList(),
-      imageUrl: data['imageUrl'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
     );
   }
 
